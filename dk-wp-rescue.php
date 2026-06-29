@@ -18,12 +18,12 @@ if (isset($_GET['task'])) {
     header('Content-Type: application/json');
     $slug = $_GET['slug'] ?? '';
     $type = $_GET['type'] ?? '';
-    $tmp_file = __DIR__ . "/temp_process_{$type}_{$slug}.zip"; // Dinamis per proses agar tidak bentrok saat loop cepat
+    $tmp_file = __DIR__ . "/temp_process_{$type}_{$slug}.zip"; // Dynamic per process to avoid conflicts during rapid looping
 
     try {
         switch ($_GET['task']) {
             case 'toggle_debug':
-                if (!file_exists($config_path)) throw new Exception("wp-config.php tidak ditemukan.");
+                if (!file_exists($config_path)) throw new Exception("wp-config.php not found.");
                 $content = file_get_contents($config_path);
                 $status = $_GET['status'] === 'true' ? 'true' : 'false';
                 if (preg_match("/define\(\s*'WP_DEBUG'\s*,\s*(true|false)\s*\);/i", $content)) {
@@ -39,7 +39,7 @@ if (isset($_GET['task'])) {
                 $url = ($type === 'core') ? "https://wordpress.org/latest.zip" : (($type === 'plugin') ? "https://downloads.wordpress.org/plugin/{$slug}.latest-stable.zip" : "https://downloads.wordpress.org/theme/{$slug}.latest-stable.zip");
                 $options = array("http" => array("header" => "User-Agent: Mozilla/5.0\r\n"));
                 $file_data = file_get_contents($url, false, stream_context_create($options));
-                if (!$file_data) throw new Exception("Gagal download paket.");
+                if (!$file_data) throw new Exception("Failed to download package.");
                 file_put_contents($tmp_file, $file_data);
                 echo json_encode(['status' => 'success']);
                 break;
@@ -63,7 +63,7 @@ if (isset($_GET['task'])) {
                     }
                     echo json_encode(['status' => 'success']);
                 } else {
-                    throw new Exception("Gagal ekstrak.");
+                    throw new Exception("Failed to extract package.");
                 }
                 break;
 
@@ -105,13 +105,13 @@ if (file_exists($config_path)) {
 $plugins = array_filter(glob(WP_CONTENT_DIR . '/plugins/*'), 'is_dir');
 $themes = array_filter(glob(WP_CONTENT_DIR . '/themes/*'), 'is_dir');
 
-// Pastikan baris ini ada untuk mengubah path folder menjadi array berisi text (slug) saja
+// Path folder structures parsed into layout slugs
 $plugin_slugs = array_values(array_map('basename', $plugins));
 $theme_slugs = array_values(array_map('basename', $themes));
 ?>
 
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -374,7 +374,6 @@ $theme_slugs = array_values(array_map('basename', $themes));
         </div>
 
         <div class="grid">
-            <!-- PLUGINS COLUMN -->
             <div class="card">
                 <div class="card-header-flex">
                     <h2>🔌 Installed Plugins</h2>
@@ -404,7 +403,6 @@ $theme_slugs = array_values(array_map('basename', $themes));
                 </table>
             </div>
 
-            <!-- THEMES COLUMN -->
             <div class="card">
                 <div class="card-header-flex">
                     <h2>🎨 Installed Themes</h2>
@@ -455,11 +453,11 @@ $theme_slugs = array_values(array_map('basename', $themes));
             }
         }
 
-        // Modifikasi runAction menerima parameter promptConfirm untuk membedakan single vs bulk klik
+        // runAction function with automatic temporary ZIP cleanup integration
         async function runAction(slug, type, promptConfirm = true) {
-            // 1. Alert/Confirm SEBELUM proses dimulai
+            // 1. Alert/Confirm BEFORE the process starts
             if (type === 'core') {
-                if (!confirm('Peringatan: Anda akan mengunduh dan menginstal ulang Core WordPress. Apakah Anda yakin ingin melanjutkan?')) return;
+                if (!confirm('Warning: You are about to download and reinstall WordPress Core. Are you sure you want to proceed?')) return;
             } else {
                 if (promptConfirm && !confirm(`Start reinstall process for ${slug}?`)) return;
             }
@@ -470,7 +468,7 @@ $theme_slugs = array_values(array_map('basename', $themes));
 
             if (btn) btn.disabled = true;
 
-            // Reset style indicator awal
+            // Reset initial style indicators
             log.style.color = "var(--primary)";
             bar.style.background = "var(--success)";
 
@@ -480,48 +478,59 @@ $theme_slugs = array_values(array_map('basename', $themes));
                 await callAPI(slug, type, 'download');
 
                 log.innerText = "Status: Overwriting files...";
-                bar.style.width = "70%";
+                bar.style.width = "60%";
                 await callAPI(slug, type, 'extract');
+
+                // --- AUTOMATIC CLEANUP FEATURE INTEGRATION ---
+                log.innerText = "Status: Cleaning up temporary files...";
+                bar.style.width = "90%";
+                await callAPI(slug, type, 'cleanup');
 
                 log.innerText = "Status: Success!";
                 bar.style.width = "100%";
 
-                // 2. Alert SETELAH proses selesai
+                // 2. Alert AFTER the process completes
                 if (type === 'core') {
-                    alert('Sukses: Core WordPress berhasil diinstal ulang dan diperbarui!');
+                    alert('Success: WordPress Core reinstalled and updated successfully!');
                 } else if (promptConfirm) {
                     alert(`${slug} reinstalled successfully!`);
                 }
 
             } catch (e) {
-                // Bypass untuk plugin/theme premium yang tidak ada di repo (Tidak berlaku untuk Core)
-                if (type !== 'core' && (e.message.includes("Gagal download paket") || e.message.includes("Server Error"))) {
+                // Bypass for premium plugins/themes not present in the repo (Does not apply to Core)
+                if (type !== 'core' && (e.message.includes("Failed to download package") || e.message.includes("Server Error"))) {
                     log.innerText = "Status: Skipped (Not found in WP.org Repo)";
                     log.style.color = "#d97706";
                     bar.style.width = "100%";
                     bar.style.background = "#d97706";
+                    
+                    // Clean up partially downloaded zip files to avoid cluttering the root directory
+                    await callAPI(slug, type, 'cleanup').catch(() => {});
                 } else {
                     log.innerText = "Status: Error - " + e.message;
                     log.style.color = "var(--danger)";
                     bar.style.background = "var(--danger)";
+                    
+                    // Clean up zip files if the process fails mid-way
+                    await callAPI(slug, type, 'cleanup').catch(() => {});
                 }
             } finally {
                 if (btn) btn.disabled = false;
             }
         }
 
-        // Fungsi utama untuk Bulk Update berurutan
+        // Main function for sequential Bulk Update
         async function runBulkAction(type) {
-            // 1. Ambil data mentah dari PHP
+            // 1. Get raw data from PHP
             const rawList = (type === 'plugin') ? pluginList : themeList;
 
-            // 2. PENANGKAL ERROR: Paksa ubah menjadi Array, entah PHP mengirimnya sebagai Object, null, atau Array
+            // 2. ERROR PREVENTION: Force conversion to Array, whether PHP sends it as an Object, null, or Array
             const list = Array.isArray(rawList) ? rawList : Object.values(rawList || {});
 
             const bulkBtn = document.getElementById(`btn-bulk-${type}`);
 
             if (list.length === 0) {
-                alert(`Tidak ada data ${type} untuk di-update.`);
+                alert(`No ${type} data found to update.`);
                 return;
             }
 
@@ -530,7 +539,7 @@ $theme_slugs = array_values(array_map('basename', $themes));
             bulkBtn.disabled = true;
             bulkBtn.innerText = "Updating...";
 
-            // 3. Loop sekarang dijamin 100% aman karena 'list' sudah pasti Array
+            // 3. Modified loop using Object.values to guarantee it is 100% iterable
             for (let slug of Object.values(list)) {
                 await runAction(slug, type, false);
             }
