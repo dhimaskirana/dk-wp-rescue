@@ -15,9 +15,9 @@ Developed by Dhimas Kirana, the **DK WordPress Rescue Kit** is a single-file PHP
 
 ## 📂 Installation & Usage
 
- 1. Download/Copy the **dk-rescue.php** script.
+ 1. Download/Copy the **dk-wp-rescue.php** script.
  2. Upload the file to your WordPress root directory (the same folder as wp-config.php).
- 3. Access the tool via your browser: [https://yourdomain.com/dk-rescue.php?pwd=wprescue4321](https://yourdomain.com/dk-rescue.php?pwd=wprescue4321)
+ 3. Access the tool via your browser: [https://yourdomain.com/dk-wp-rescue.php?pwd=wprescue4321](https://yourdomain.com/dk-rescue.php?pwd=wprescue4321)
 
 (Note: You can change the ***$secret*** password inside the script).
 
@@ -27,7 +27,7 @@ Developed by Dhimas Kirana, the **DK WordPress Rescue Kit** is a single-file PHP
  - Reinstall the Core if you suspect system file corruption.
  - Reinstall specific Plugins or Themes identified as the source of the error.
 
-**⚠️⚠️⚠️ CLEANUP: Crucial! Delete the dk-rescue.php file from your server immediately after the site is restored.**
+**⚠️⚠️⚠️ CLEANUP: Crucial! Delete the dk-wp-rescue.php file from your server immediately after the site is restored.**
 
 ## ⚠️ Security Warning
 
